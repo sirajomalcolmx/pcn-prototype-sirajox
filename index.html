@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PCN — Online Pharmacy Practice Registration System</title>
+  <!-- React & ReactDOM -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+  <!-- Babel Standalone (transpiles JSX in the browser) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Georgia, 'Times New Roman', serif; }
+    @keyframes pcnDot {
+      0%, 80%, 100% { opacity: .3; transform: scale(.8); }
+      40%            { opacity: 1;  transform: scale(1);  }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ── Pull hooks from global React (replaces the import statement) ──────
+    const { useState, useRef } = React;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DESIGN TOKENS — PCN Brand Identity
+    // ═══════════════════════════════════════════════════════════════════════
+    const T = {
+      navy:        "#002868",
+      navyDark:    "#001845",
+      navyMid:     "#003A8C",
+      navyLight:   "#E8EDF8",
+      navyXLight:  "#F2F5FB",
+      red:         "#CC0000",
+      redLight:    "#FFF2F2",
+      gold:        "#C9922A",
+      goldLight:   "#FFF8EC",
+      success:     "#0A7C4E",
+      successBg:   "#EDFAF3",
+      warn:        "#A85F00",
+      warnBg:      "#FFF8EC",
+      danger:      "#CC0000",
+      dangerBg:    "#FFF2F2",
+      text:        "#0D1B3E",
+      textMid:     "#3A4A6A",
+      muted:       "#6A7A9B",
+      border:      "#D6DFF0",
+      bg:          "#F0F4FB",
+      white:       "#FFFFFF",
+      offWhite:    "#F7F9FE",
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DEMO REGISTRY DATA
+    // ═══════════════════════════════════════════════════════════════════════
+    const PHARMACISTS = {
+      "LAG20251D5DDA": {
+        name: "PHARM. SANUSI, M. OLUSEGUN ABAYOMI",
+        status: "Active",
+        regDate: "07/02/2014",
+        state: "Lagos",
+        stateCode: "LAG",
+        gender: "Male",
+        specialty: "Community Pharmacy",
+        qualification: "B.Pharm (University of Lagos)",
+      },
+      "KAN20181B3FFA": {
+        name: "PHARM. IBRAHIM, FATIMA AL-HASSAN",
+        status: "Active",
+        regDate: "15/06/2018",
+        state: "Kano",
+        stateCode: "KAN",
+        gender: "Female",
+        specialty: "Hospital Pharmacy",
+        qualification: "B.Pharm (Ahmadu Bello University)",
+      },
+      "ABJ20200C7GHB": {
+        name: "PHARM. OKONKWO, CHUKWUEMEKA DAVID",
+        status: "Active",
+        regDate: "22/03/2020",
+        state: "FCT Abuja",
+        stateCode: "FCT",
+        gender: "Male",
+        specialty: "Industrial Pharmacy",
+        qualification: "B.Pharm, M.Sc (University of Nigeria)",
+      },
+      "SOK20151E2CCX": {
+        name: "PHARM. ALIYU, MARYAM BASHIR",
+        status: "Inactive",
+        regDate: "10/11/2015",
+        state: "Sokoto",
+        stateCode: "SOK",
+        gender: "Female",
+        specialty: "Community Pharmacy",
+        qualification: "B.Pharm (Usman Dan Fodio University)",
+      },
+    };
+
+    const PREMISES = {
+      "MASCOT PHARMACY & STORES": {
+        address: "1, MONILARI CLOSE, SHAGARI ESTATE, IPAJA",
+        lga: "Alimosho",
+        state: "Lagos",
+        stateCode: "LAG",
+        licenseStatus: "Valid",
+        licenseNo: "PCN/CP/LAG/2024/1198",
+        licenseExpiry: "31/12/2026",
+        type: "Community Pharmacy",
+      },
+      "GOLDEN HEALTH PHARMACY": {
+        address: "PLOT 45, AHMADU BELLO WAY, NASSARAWA GRA, KANO",
+        lga: "Kano Municipal",
+        state: "Kano",
+        stateCode: "KAN",
+        licenseStatus: "Valid",
+        licenseNo: "PCN/CP/KAN/2023/0487",
+        licenseExpiry: "31/12/2025",
+        type: "Community Pharmacy",
+      },
+      "FEDERAL MEDICAL PHARMACY": {
+        address: "12B, ADETOKUNBO ADEMOLA CRESCENT, WUSE II, ABUJA",
+        lga: "Abuja Municipal Area Council",
+        state: "FCT Abuja",
+        stateCode: "FCT",
+        licenseStatus: "Pending Renewal",
+        licenseNo: "PCN/CP/FCT/2022/0234",
+        licenseExpiry: "31/12/2024",
+        type: "Community Pharmacy",
+      },
+    };
+
+    const REQUIRED_DOCS = [
+      { id: "cac",          label: "CAC Documents",                              hint: "Corporate Affairs Commission certificate of incorporation" },
+      { id: "employment",   label: "Employment Letter of Superintendent Pharmacist", hint: "Signed letter of appointment / employment" },
+      { id: "sop",          label: "Standard Operating Procedures (SOPs)",       hint: "Documented operational procedures for the online pharmacy" },
+      { id: "architecture", label: "Website / System Architecture Diagram",      hint: "Technical architecture of the online pharmacy platform" },
+      { id: "payment",      label: "Evidence of Payment",                        hint: "Bank teller or electronic payment receipt" },
+      { id: "inspection",   label: "Inspection Report",                          hint: "PCN pre-registration inspection clearance report" },
+    ];
+
+    const CATEGORIES = ["Community Pharmacy", "Wholesale", "Distribution", "Aggregator"];
+
+    const ROLES_CONFIG = [
+      { id: "data_entry",     label: "Data Entry Officer",       icon: "✍️",  desc: "Submit & manage new applications" },
+      { id: "recommendation", label: "Recommendation Officer",   icon: "🔍", desc: "Review documents & recommend" },
+      { id: "approval",       label: "Approval Officer",         icon: "✅", desc: "Approve or decline applications" },
+      { id: "printing",       label: "Printing Officer",         icon: "🖨️", desc: "Generate & print practice permits" },
+    ];
+
+    const STATUS_COLORS = {
+      Draft:               { bg: "#EEF2FF", fg: "#4338CA", dot: "#818CF8" },
+      Submitted:           { bg: "#EFF6FF", fg: "#1D4ED8", dot: "#60A5FA" },
+      Recommended:         { bg: T.successBg, fg: T.success, dot: "#34D399" },
+      "Not Recommended":   { bg: T.warnBg,   fg: T.warn,    dot: "#F59E0B" },
+      Approved:            { bg: T.successBg, fg: T.success, dot: "#10B981" },
+      Declined:            { bg: T.redLight,  fg: T.red,     dot: T.red    },
+      "Permit Generated":  { bg: "#F5F3FF",  fg: "#7C3AED", dot: "#8B5CF6" },
+      Active:              { bg: T.successBg, fg: T.success, dot: "#10B981" },
+      Inactive:            { bg: "#FEF2F2",  fg: "#DC2626", dot: "#EF4444" },
+      Valid:               { bg: T.successBg, fg: T.success, dot: "#10B981" },
+      "Pending Renewal":   { bg: T.warnBg,   fg: T.warn,    dot: "#F59E0B" },
+    };
+
+    const INITIAL_APPS = [
+      {
+        id: "PCN/OPP/APP/2026/0001",
+        regNum: "LAG20251D5DDA",
+        pharmacist: PHARMACISTS["LAG20251D5DDA"],
+        premisesName: "MASCOT PHARMACY & STORES",
+        premises: PREMISES["MASCOT PHARMACY & STORES"],
+        category: "Community Pharmacy",
+        aggDetails: null,
+        docs: {
+          cac:          { name: "CAC_Certificate_Mascot_Pharmacy.pdf",   size: "2.3 MB", at: "06/04/2026, 08:14" },
+          employment:   { name: "Employment_Letter_Sanusi_M_O.pdf",      size: "0.8 MB", at: "06/04/2026, 08:15" },
+          sop:          { name: "Mascot_Standard_Operating_Procedures.pdf", size: "4.1 MB", at: "06/04/2026, 08:17" },
+          architecture: { name: "Mascot_System_Architecture_v2.pdf",     size: "1.6 MB", at: "06/04/2026, 08:18" },
+          payment:      { name: "PCN_Payment_Receipt_Mascot.pdf",         size: "0.4 MB", at: "06/04/2026, 08:19" },
+          inspection:   { name: "PCN_Inspection_Report_LAG2026_Mascot.pdf", size: "3.2 MB", at: "06/04/2026, 08:20" },
+        },
+        status: "Submitted",
+        permitNumber: null,
+        recommendation: null,
+        approval: null,
+        timeline: [
+          { status: "Draft",     by: "Data Entry Officer",  byId: "DEO/LAG/001", at: "06/04/2026, 08:10:22", note: "Application created and data entry commenced" },
+          { status: "Submitted", by: "Data Entry Officer",  byId: "DEO/LAG/001", at: "06/04/2026, 08:22:47", note: "All 6 required documents uploaded. Application submitted for regulatory review." },
+        ],
+      },
+    ];
+
+    let permitSeq = 2;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SHARED UI PRIMITIVES
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function PCNLogo({ size = 48 }) {
+      return (
+        <svg width={size} height={size} viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
+          <circle cx="50" cy="50" r="48" fill={T.navy} stroke={T.red} strokeWidth="5.5" />
+          <circle cx="50" cy="50" r="41" fill={T.navy} stroke="rgba(255,255,255,.18)" strokeWidth="1.5" />
+          <text x="10" y="77" fontFamily="Georgia,serif" fontWeight="900" fontSize="70" fill="white" opacity=".96">P</text>
+          <text x="41" y="78" fontFamily="Georgia,serif" fontWeight="900" fontSize="35" fill={T.red}>cn</text>
+          <rect x="46" y="19" width="30" height="19" rx="3" fill="rgba(255,255,255,.13)" />
+          <text x="49" y="33" fontFamily="Georgia,serif" fontWeight="900" fontSize="14" fill="white">Rx</text>
+        </svg>
+      );
+    }
+
+    function Badge({ status }) {
+      const c = STATUS_COLORS[status] || { bg: T.bg, fg: T.muted, dot: T.muted };
+      return (
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 5,
+          background: c.bg, color: c.fg, padding: "3px 10px",
+          borderRadius: 20, fontSize: 11.5, fontWeight: 700, letterSpacing: 0.2,
+          whiteSpace: "nowrap", border: `1px solid ${c.dot}30`,
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.dot, flexShrink: 0 }} />
+          {status}
+        </span>
+      );
+    }
+
+    function StepBar({ steps, current }) {
+      return (
+        <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 32 }}>
+          {steps.map((label, i) => {
+            const done = i < current, active = i === current;
+            return (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", flex: i < steps.length - 1 ? 1 : "none" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 72 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: done ? T.success : active ? T.navy : T.border,
+                    color: (done || active) ? "white" : T.muted,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontWeight: 800, fontSize: 13, transition: "all .3s",
+                    boxShadow: active ? `0 0 0 5px ${T.navyLight}` : "none",
+                    border: `2px solid ${done ? T.success : active ? T.navy : T.border}`,
+                  }}>
+                    {done ? "✓" : i + 1}
+                  </div>
+                  <span style={{
+                    fontSize: 10.5, marginTop: 6, fontWeight: active ? 700 : 500,
+                    color: active ? T.navy : done ? T.success : T.muted,
+                    textAlign: "center", maxWidth: 72, lineHeight: 1.3,
+                  }}>{label}</span>
+                </div>
+                {i < steps.length - 1 && (
+                  <div style={{
+                    flex: 1, height: 2,
+                    background: i < current ? T.success : T.border,
+                    marginTop: 17, marginLeft: -4, marginRight: -4,
+                    borderRadius: 1, transition: "background .3s",
+                  }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    function Card({ children, style = {}, noPad }) {
+      return (
+        <div style={{
+          background: T.white, borderRadius: 12,
+          padding: noPad ? 0 : "22px 26px",
+          border: `1px solid ${T.border}`,
+          boxShadow: "0 1px 3px rgba(0,40,104,.05), 0 4px 14px rgba(0,40,104,.04)",
+          overflow: "hidden",
+          ...style
+        }}>
+          {children}
+        </div>
+      );
+    }
+
+    function SecHead({ title, sub }) {
+      return (
+        <div style={{ marginBottom: 20, paddingBottom: 10, borderBottom: `2px solid ${T.red}` }}>
+          <h3 style={{ fontSize: 14.5, fontWeight: 800, color: T.navy, margin: 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            {title}
+          </h3>
+          {sub && <p style={{ fontSize: 12, color: T.muted, marginTop: 5, marginBottom: 0 }}>{sub}</p>}
+        </div>
+      );
+    }
+
+    function FL({ label, req, children, hint }) {
+      return (
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: T.textMid, marginBottom: 5, letterSpacing: 0.3, textTransform: "uppercase" }}>
+            {label} {req && <span style={{ color: T.red }}>*</span>}
+          </label>
+          {children}
+          {hint && <p style={{ fontSize: 11, color: T.muted, marginTop: 4, marginBottom: 0 }}>{hint}</p>}
+        </div>
+      );
+    }
+
+    function FInput({ value, onChange, readOnly, placeholder, type = "text", error, mono }) {
+      return (
+        <input
+          type={type} value={value}
+          onChange={onChange} readOnly={readOnly} placeholder={placeholder}
+          style={{
+            width: "100%", padding: "9px 13px", borderRadius: 7,
+            border: `1.5px solid ${error ? T.red : readOnly ? T.border : "#B4C3DF"}`,
+            background: readOnly ? T.offWhite : T.white,
+            color: T.text, fontSize: 13.5, outline: "none",
+            boxSizing: "border-box", fontFamily: mono ? "monospace" : "Georgia, serif",
+            transition: "border-color .2s", cursor: readOnly ? "not-allowed" : "text",
+          }}
+        />
+      );
+    }
+
+    function FSelect({ value, onChange, options, placeholder = "-- Select --" }) {
+      return (
+        <select value={value} onChange={onChange}
+          style={{
+            width: "100%", padding: "9px 13px", borderRadius: 7,
+            border: `1.5px solid #B4C3DF`, background: T.white,
+            color: value ? T.text : T.muted, fontSize: 13.5,
+            outline: "none", boxSizing: "border-box",
+            fontFamily: "Georgia, serif", cursor: "pointer",
+          }}>
+          <option value="">{placeholder}</option>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      );
+    }
+
+    function FTextarea({ value, onChange, placeholder, rows = 3 }) {
+      return (
+        <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows}
+          style={{
+            width: "100%", padding: "9px 13px", borderRadius: 7,
+            border: `1.5px solid #B4C3DF`, background: T.white,
+            color: T.text, fontSize: 13.5, resize: "vertical",
+            outline: "none", boxSizing: "border-box", fontFamily: "Georgia, serif",
+          }} />
+      );
+    }
+
+    function Btn({ children, onClick, variant = "primary", disabled, size = "md", sx = {} }) {
+      const V = {
+        primary: { bg: T.navy,    fg: "white",  bd: "none" },
+        success: { bg: T.success, fg: "white",  bd: "none" },
+        danger:  { bg: T.red,     fg: "white",  bd: "none" },
+        gold:    { bg: T.gold,    fg: "white",  bd: "none" },
+        outline: { bg: T.white,   fg: T.navy,   bd: `2px solid ${T.navy}` },
+        ghost:   { bg: "transparent", fg: T.muted, bd: `1.5px solid ${T.border}` },
+      };
+      const S = {
+        sm: { padding: "5px 13px", fontSize: 12 },
+        md: { padding: "9px 20px", fontSize: 13.5 },
+        lg: { padding: "11px 28px", fontSize: 14 },
+      };
+      const v = V[variant], s = S[size];
+      return (
+        <button onClick={onClick} disabled={disabled}
+          style={{
+            ...s, borderRadius: 7, fontWeight: 700,
+            background: disabled ? "#E5EAF3" : v.bg,
+            color: disabled ? T.muted : v.fg,
+            border: disabled ? `1px solid ${T.border}` : (v.bd || "none"),
+            cursor: disabled ? "not-allowed" : "pointer",
+            fontFamily: "Georgia, serif",
+            display: "inline-flex", alignItems: "center", gap: 6,
+            transition: "opacity .15s",
+            opacity: disabled ? .7 : 1,
+            ...sx,
+          }}>
+          {children}
+        </button>
+      );
+    }
+
+    function Alert({ type = "info", children }) {
+      const C = {
+        info:    { bg: T.navyLight,  fg: T.navy,    icon: "ℹ️" },
+        error:   { bg: T.redLight,   fg: T.red,     icon: "⚠️" },
+        success: { bg: T.successBg,  fg: T.success, icon: "✅" },
+        warn:    { bg: T.warnBg,     fg: T.warn,    icon: "⚠️" },
+      };
+      const c = C[type];
+      return (
+        <div style={{
+          background: c.bg, color: c.fg,
+          border: `1px solid ${c.fg}25`,
+          borderRadius: 8, padding: "10px 14px",
+          fontSize: 12.5, display: "flex", gap: 8, alignItems: "flex-start",
+        }}>
+          <span style={{ flexShrink: 0 }}>{c.icon}</span>
+          <span style={{ lineHeight: 1.5 }}>{children}</span>
+        </div>
+      );
+    }
+
+    function Dots() {
+      return (
+        <span style={{ display: "inline-flex", gap: 3, alignItems: "center" }}>
+          {[0,1,2].map(i => (
+            <span key={i} style={{
+              width: 5, height: 5, borderRadius: "50%",
+              background: "currentColor",
+              animation: `pcnDot 1.2s ease-in-out ${i * 0.22}s infinite`,
+            }}/>
+          ))}
+        </span>
+      );
+    }
+
+    function IR({ label, value, em }) {
+      return (
+        <div style={{ display: "flex", gap: 8, padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: T.muted, minWidth: 148, flexShrink: 0, textTransform: "uppercase", letterSpacing: 0.2 }}>{label}</span>
+          <span style={{ fontSize: 13, color: em ? T.navy : T.text, fontWeight: em ? 700 : 400, flex: 1 }}>{value || "—"}</span>
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LOGIN PAGE
+    // ═══════════════════════════════════════════════════════════════════════
+    function Login({ onLogin }) {
+      const [role, setRole] = useState("");
+      const [pass, setPass] = useState("");
+      const [err, setErr] = useState("");
+      const [loading, setLoading] = useState(false);
+
+      function handleLogin() {
+        if (!role) return setErr("Please select your assigned role to continue.");
+        if (!pass) return setErr("Password is required.");
+        if (pass !== "pcn2026") return setErr("Invalid password. Demo password: pcn2026");
+        setErr(""); setLoading(true);
+        setTimeout(() => onLogin(role), 1300);
+      }
+
+      return (
+        <div style={{
+          minHeight: "100vh",
+          background: `linear-gradient(155deg, ${T.navyDark} 0%, ${T.navy} 50%, #004DB3 100%)`,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          position: "relative", overflow: "hidden",
+        }}>
+          {[300,440,580].map((s,i) => (
+            <div key={i} style={{
+              position: "fixed", top: -s/3, right: -s/3,
+              width: s, height: s, borderRadius: "50%",
+              border: `1px solid rgba(204,0,0,${0.12 - i*0.03})`,
+              pointerEvents: "none",
+            }}/>
+          ))}
+          {[250,380].map((s,i) => (
+            <div key={i} style={{
+              position: "fixed", bottom: -s/3, left: -s/3,
+              width: s, height: s, borderRadius: "50%",
+              border: `1px solid rgba(255,255,255,${0.05 - i*0.02})`,
+              pointerEvents: "none",
+            }}/>
+          ))}
+
+          <div style={{ width: "100%", maxWidth: 500, padding: "0 20px", zIndex: 1 }}>
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+                <div style={{ padding: 10, background: "rgba(255,255,255,.06)", borderRadius: "50%", border: "1px solid rgba(255,255,255,.12)" }}>
+                  <PCNLogo size={80} />
+                </div>
+              </div>
+              <h1 style={{ color: T.white, fontSize: 19, fontWeight: 900, margin: "0 0 4px", letterSpacing: 2, textTransform: "uppercase" }}>
+                Pharmacy Council of Nigeria
+              </h1>
+              <p style={{ color: T.red, fontWeight: 800, fontSize: 11.5, margin: "4px 0 0", letterSpacing: 3.5, textTransform: "uppercase" }}>
+                Online Pharmacy Practice Registration System
+              </p>
+              <p style={{ color: "rgba(255,255,255,.36)", fontSize: 11.5, marginTop: 8 }}>
+                OPRIS v2.1 — Intranet Portal — Authorised Access Only
+              </p>
+              <div style={{ width: 50, height: 2.5, background: `linear-gradient(90deg, ${T.red}, ${T.gold})`, margin: "14px auto 0", borderRadius: 2 }} />
+            </div>
+
+            <Card style={{ padding: "30px 34px" }}>
+              <h2 style={{ fontSize: 15.5, fontWeight: 800, color: T.navy, margin: "0 0 22px" }}>Staff Authentication</h2>
+
+              <FL label="Select Your Role" req>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {ROLES_CONFIG.map(r => (
+                    <div key={r.id} onClick={() => { setRole(r.id); setErr(""); }}
+                      style={{
+                        padding: "11px 10px 9px", borderRadius: 9,
+                        border: `2px solid ${role === r.id ? T.navy : T.border}`,
+                        background: role === r.id ? T.navyLight : T.offWhite,
+                        cursor: "pointer", textAlign: "center", transition: "all .18s",
+                      }}>
+                      <div style={{ fontSize: 22, marginBottom: 4 }}>{r.icon}</div>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: role === r.id ? T.navy : T.text, lineHeight: 1.3 }}>{r.label}</div>
+                      <div style={{ fontSize: 10.5, color: T.muted, marginTop: 3 }}>{r.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </FL>
+
+              <FL label="Password" req hint="Demo password: pcn2026">
+                <FInput type="password" value={pass}
+                  onChange={e => { setPass(e.target.value); setErr(""); }}
+                  placeholder="Enter staff portal password"
+                />
+              </FL>
+
+              {err && <div style={{ marginBottom: 14 }}><Alert type="error">{err}</Alert></div>}
+
+              <Btn onClick={handleLogin} disabled={loading} size="lg" sx={{ width: "100%", justifyContent: "center" }}>
+                {loading ? <><Dots /> Authenticating…</> : "LOGIN TO PORTAL →"}
+              </Btn>
+            </Card>
+
+            <p style={{ textAlign: "center", color: "rgba(255,255,255,.25)", fontSize: 11, marginTop: 16 }}>
+              PCN OPRIS — Federal Ministry of Health · Confidential Government System
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SHELL / LAYOUT
+    // ═══════════════════════════════════════════════════════════════════════
+    function Shell({ role, onLogout, tab, setTab, children }) {
+      const rConf = ROLES_CONFIG.find(r => r.id === role) || {};
+      const mainLabel = {
+        data_entry: "New Application",
+        recommendation: "Review Queue",
+        approval: "Approval Queue",
+        printing: "Permit Printing",
+      }[role];
+
+      return (
+        <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "Georgia, 'Times New Roman', serif" }}>
+          <div style={{
+            background: T.navy, height: 56, padding: "0 28px",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            boxShadow: "0 2px 14px rgba(0,0,0,.22)",
+            position: "sticky", top: 0, zIndex: 200,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+              <PCNLogo size={35} />
+              <div>
+                <div style={{ color: T.white, fontWeight: 900, fontSize: 12.5, letterSpacing: 1, textTransform: "uppercase" }}>
+                  Pharmacy Council of Nigeria
+                </div>
+                <div style={{ color: "rgba(255,255,255,.45)", fontSize: 10 }}>
+                  Online Pharmacy Practice Registration &amp; Permit Issuance System
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ background: "rgba(255,255,255,.07)", borderRadius: 7, padding: "5px 13px", display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 16 }}>{rConf.icon}</span>
+                <div>
+                  <div style={{ color: T.red, fontSize: 11, fontWeight: 800, letterSpacing: 0.4 }}>{rConf.label}</div>
+                  <div style={{ color: "rgba(255,255,255,.38)", fontSize: 10 }}>PCN Intranet</div>
+                </div>
+              </div>
+              <button onClick={onLogout}
+                style={{ background: "rgba(204,0,0,.18)", color: "#FF8080", border: "1px solid rgba(204,0,0,.3)", borderRadius: 6, padding: "6px 14px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                LOGOUT
+              </button>
+            </div>
+          </div>
+
+          <div style={{ height: 3, background: `linear-gradient(90deg, ${T.red} 0%, ${T.gold} 50%, ${T.red} 100%)` }} />
+
+          <div style={{ background: T.white, borderBottom: `1px solid ${T.border}`, padding: "0 28px", display: "flex", gap: 0 }}>
+            {[
+              { id: "main", label: mainLabel, icon: rConf.icon },
+              { id: "audit", label: "Audit Trail", icon: "📋" },
+            ].map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                style={{
+                  padding: "12px 22px", border: "none", background: "none",
+                  fontWeight: tab === t.id ? 800 : 500,
+                  color: tab === t.id ? T.navy : T.muted,
+                  borderBottom: tab === t.id ? `3px solid ${T.red}` : "3px solid transparent",
+                  cursor: "pointer", fontSize: 13, fontFamily: "inherit",
+                  display: "flex", alignItems: "center", gap: 7, marginBottom: -1,
+                }}>
+                <span>{t.icon}</span> {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "26px 24px" }}>
+            {children}
+          </div>
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DATA ENTRY — 4-STEP WIZARD
+    // ═══════════════════════════════════════════════════════════════════════
+    function DataEntry({ apps, onSubmit }) {
+      const [step, setStep] = useState(0);
+      const [regNum, setRegNum]         = useState("");
+      const [verifying, setVerifying]   = useState(false);
+      const [pharmacist, setPharmacist] = useState(null);
+      const [regErr, setRegErr]         = useState("");
+      const [premisesInput, setPremisesInput] = useState("");
+      const [lookingUp, setLookingUp]         = useState(false);
+      const [premises, setPremises]           = useState(null);
+      const [premisesErr, setPremisesErr]     = useState("");
+      const [category, setCategory]           = useState("");
+      const [agg, setAgg] = useState({ name:"", superintendent:"", address:"", affiliates:"", email:"", phone:"" });
+      const [docs, setDocs]     = useState({});
+      const [dragOver, setDragOver] = useState(null);
+      const [submitting, setSubmitting] = useState(false);
+      const [done, setDone]             = useState(false);
+
+      function verifyReg() {
+        if (!regNum.trim()) return setRegErr("Please enter a Registration Number.");
+        setVerifying(true); setRegErr(""); setPharmacist(null);
+        setTimeout(() => {
+          setVerifying(false);
+          const p = PHARMACISTS[regNum.trim().toUpperCase()];
+          if (!p) return setRegErr(`Registration number "${regNum.toUpperCase()}" was not found in the PCN registry.`);
+          if (p.status !== "Active") return setRegErr(`This pharmacist's status is "${p.status}". Only pharmacists with Active status may proceed.`);
+          setPharmacist(p);
+        }, 1100);
+      }
+
+      function lookupPremises() {
+        if (!premisesInput.trim()) return setPremisesErr("Please enter the registered premises name.");
+        setLookingUp(true); setPremisesErr(""); setPremises(null);
+        setTimeout(() => {
+          setLookingUp(false);
+          const key = premisesInput.trim().toUpperCase();
+          const p = PREMISES[key];
+          if (!p) return setPremisesErr("Premises not found in PCN licensing database. Please verify the name and try again.");
+          if (p.licenseStatus === "Pending Renewal") {
+            return setPremisesErr(`License status is "${p.licenseStatus}". This premises cannot proceed until the license is renewed and marked Valid.`);
+          }
+          setPremises(p);
+        }, 950);
+      }
+
+      function handleDrop(docId, e) {
+        e.preventDefault(); setDragOver(null);
+        const f = e.dataTransfer?.files?.[0];
+        if (!f) return;
+        if (!f.name.toLowerCase().endsWith(".pdf")) return alert("Only PDF files are accepted by this system.");
+        if (f.size > 5 * 1024 * 1024) return alert("File size must not exceed 5 MB.");
+        setDocs(d => ({ ...d, [docId]: { name: f.name, size: `${(f.size/1048576).toFixed(1)} MB`, at: new Date().toLocaleString("en-NG") } }));
+      }
+
+      function simUpload(docId) {
+        const label = REQUIRED_DOCS.find(d => d.id === docId).label;
+        setDocs(d => ({
+          ...d,
+          [docId]: {
+            name: `${label.replace(/[^A-Za-z0-9]/g, "_")}.pdf`,
+            size: `${(Math.random()*3.5+0.5).toFixed(1)} MB`,
+            at: new Date().toLocaleString("en-NG"),
+          }
+        }));
+      }
+
+      const allDocs      = REQUIRED_DOCS.every(d => docs[d.id]);
+      const aggComplete  = category !== "Aggregator" || Object.values(agg).every(v => v.trim());
+      const canStep2     = premises && category && aggComplete;
+
+      function handleSubmit() {
+        setSubmitting(true);
+        setTimeout(() => {
+          const now = new Date().toLocaleString("en-NG");
+          const seq = String(apps.length + 2).padStart(4, "0");
+          onSubmit({
+            id: `PCN/OPP/APP/2026/${seq}`,
+            regNum: regNum.toUpperCase(),
+            pharmacist, premisesName: premisesInput.toUpperCase(),
+            premises, category,
+            aggDetails: category === "Aggregator" ? { ...agg } : null,
+            docs: { ...docs },
+            status: "Submitted",
+            permitNumber: null,
+            recommendation: null,
+            approval: null,
+            timeline: [
+              { status: "Draft",     by: "Data Entry Officer", byId: "DEO/001", at: now, note: "Application created" },
+              { status: "Submitted", by: "Data Entry Officer", byId: "DEO/001", at: now, note: "All documents uploaded. Application submitted for regulatory review." },
+            ],
+          });
+          setSubmitting(false); setDone(true);
+        }, 1500);
+      }
+
+      if (done) return (
+        <Card style={{ textAlign: "center", padding: "56px 40px" }}>
+          <div style={{ fontSize: 60, marginBottom: 14 }}>✅</div>
+          <h2 style={{ color: T.success, fontSize: 21, fontWeight: 900, margin: "0 0 8px" }}>Application Submitted Successfully</h2>
+          <p style={{ color: T.muted, fontSize: 14, margin: "0 0 6px" }}>
+            Application for <strong>{pharmacist?.name}</strong> has been forwarded to the Recommendation Officer.
+          </p>
+          <p style={{ color: T.muted, fontSize: 13, margin: "0 0 28px" }}>
+            Application ID: <strong style={{ fontFamily: "monospace" }}>PCN/OPP/APP/2026/{String(apps.length + 1).padStart(4, "0")}</strong>
+          </p>
+          <div style={{ marginBottom: 28 }}><Badge status="Submitted" /></div>
+          <Btn onClick={() => {
+            setStep(0); setRegNum(""); setPharmacist(null); setRegErr("");
+            setPremisesInput(""); setPremises(null); setPremisesErr("");
+            setCategory(""); setAgg({ name:"",superintendent:"",address:"",affiliates:"",email:"",phone:"" });
+            setDocs({}); setDone(false);
+          }} size="lg">+ Start New Application</Btn>
+        </Card>
+      );
+
+      const STEPS = ["Identity Verification", "Practice Details", "Document Upload", "Review & Submit"];
+
+      return (
+        <div>
+          <div style={{ marginBottom: 22 }}>
+            <h2 style={{ fontSize: 19, fontWeight: 900, color: T.navy, margin: 0 }}>New Online Pharmacy Practice Application</h2>
+            <p style={{ color: T.muted, fontSize: 13, marginTop: 5 }}>Complete all steps to submit an application for regulatory review.</p>
+          </div>
+
+          <StepBar steps={STEPS} current={step} />
+
+          {step === 0 && (
+            <Card>
+              <SecHead title="Step 1 — Superintendent Pharmacist Identity Verification"
+                sub="Enter the PCN Registration Number of the Superintendent Pharmacist. The system will verify identity against the PCN registry." />
+              <div style={{ maxWidth: 560 }}>
+                <FL label="PCN Registration Number" req>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <FInput value={regNum}
+                        onChange={e => { setRegNum(e.target.value.toUpperCase()); setRegErr(""); setPharmacist(null); }}
+                        placeholder="e.g. LAG20251D5DDA"
+                        error={!!regErr} mono
+                      />
+                    </div>
+                    <Btn onClick={verifyReg} disabled={verifying}>
+                      {verifying ? <><Dots /> Verifying…</> : "🔍 Verify"}
+                    </Btn>
+                  </div>
+                  <p style={{ fontSize: 11, color: T.muted, marginTop: 5 }}>
+                    Demo numbers: <code>LAG20251D5DDA</code> (Active) · <code>KAN20181B3FFA</code> (Active) · <code>SOK20151E2CCX</code> (Inactive)
+                  </p>
+                </FL>
+                {regErr && <div style={{ marginBottom: 14 }}><Alert type="error">{regErr}</Alert></div>}
+                {pharmacist && (
+                  <div style={{ background: T.successBg, border: `1px solid ${T.success}35`, borderRadius: 10, padding: "16px 18px", marginBottom: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <span style={{ fontWeight: 800, color: T.success, fontSize: 13 }}>✓ Pharmacist Verified</span>
+                      <Badge status={pharmacist.status} />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                      <IR label="Full Name"            value={pharmacist.name}          em />
+                      <IR label="Registration Status"  value={pharmacist.status} />
+                      <IR label="Registration Date"    value={pharmacist.regDate} />
+                      <IR label="State of Practice"    value={pharmacist.state} />
+                      <IR label="Gender"               value={pharmacist.gender} />
+                      <IR label="Qualification"        value={pharmacist.qualification} />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                <Btn onClick={() => setStep(1)} disabled={!pharmacist} size="lg">Next: Practice Details →</Btn>
+              </div>
+            </Card>
+          )}
+
+          {step === 1 && (
+            <Card>
+              <SecHead title="Step 2 — Location and Practice Details"
+                sub="Enter the registered premises name. The system will auto-retrieve licensing details from the PCN database." />
+              <div style={{ maxWidth: 620 }}>
+                <FL label="Registered Premises Name" req>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <FInput value={premisesInput}
+                        onChange={e => { setPremisesInput(e.target.value.toUpperCase()); setPremisesErr(""); setPremises(null); }}
+                        placeholder="e.g. MASCOT PHARMACY & STORES"
+                        error={!!premisesErr}
+                      />
+                    </div>
+                    <Btn onClick={lookupPremises} disabled={lookingUp}>
+                      {lookingUp ? <><Dots /> Searching…</> : "🔍 Lookup"}
+                    </Btn>
+                  </div>
+                  <p style={{ fontSize: 11, color: T.muted, marginTop: 5 }}>
+                    Demo: <code>MASCOT PHARMACY & STORES</code> (Valid) · <code>GOLDEN HEALTH PHARMACY</code> (Valid) · <code>FEDERAL MEDICAL PHARMACY</code> (Pending Renewal — will be blocked)
+                  </p>
+                </FL>
+                {premisesErr && <div style={{ marginBottom: 14 }}><Alert type="error">{premisesErr}</Alert></div>}
+                {premises && (
+                  <div style={{ background: T.navyLight, border: `1px solid ${T.navy}20`, borderRadius: 10, padding: "16px 18px", marginBottom: 18 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <span style={{ fontWeight: 800, color: T.navy, fontSize: 13 }}>✓ Premises Found in Registry</span>
+                      <Badge status={premises.licenseStatus} />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                      <IR label="Premises Address"  value={premises.address} />
+                      <IR label="LGA"               value={premises.lga} />
+                      <IR label="State"             value={premises.state} />
+                      <IR label="License Number"    value={premises.licenseNo} em />
+                      <IR label="License Status"    value={premises.licenseStatus} />
+                      <IR label="License Expiry"    value={premises.licenseExpiry} />
+                    </div>
+                  </div>
+                )}
+                <FL label="Category of Practice" req>
+                  <FSelect value={category}
+                    onChange={e => { setCategory(e.target.value); setAgg({ name:"",superintendent:"",address:"",affiliates:"",email:"",phone:"" }); }}
+                    options={CATEGORIES}
+                  />
+                </FL>
+                {category === "Aggregator" && (
+                  <div style={{ background: T.goldLight, border: `1px solid ${T.gold}40`, borderRadius: 10, padding: "18px 20px", marginTop: 4 }}>
+                    <p style={{ fontWeight: 800, color: T.gold, fontSize: 13, margin: "0 0 16px", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                      📋 Aggregator-Specific Details — All Fields Mandatory
+                    </p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+                      {[
+                        { k: "name",           label: "Name of Aggregator",             span: false },
+                        { k: "superintendent", label: "Superintendent Pharmacist",       span: false },
+                        { k: "email",          label: "Official Email Address",          span: false },
+                        { k: "phone",          label: "Mobile Telephone Number",         span: false },
+                        { k: "address",        label: "Physical Address of the Pharmacy", span: true },
+                        { k: "affiliates",     label: "List of Affiliated Pharmacies",   span: true, hint: "Separate multiple entries with commas" },
+                      ].map(f => (
+                        <div key={f.k} style={f.span ? { gridColumn: "span 2" } : {}}>
+                          <FL label={f.label} req hint={f.hint}>
+                            <FInput value={agg[f.k]} onChange={e => setAgg(d => ({ ...d, [f.k]: e.target.value }))} />
+                          </FL>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+                <Btn variant="ghost" onClick={() => setStep(0)}>← Back</Btn>
+                <Btn onClick={() => setStep(2)} disabled={!canStep2} size="lg">Next: Document Upload →</Btn>
+              </div>
+            </Card>
+          )}
+
+          {step === 2 && (
+            <Card>
+              <SecHead title="Step 3 — Document Upload"
+                sub="Upload all 6 required documents in PDF format. Maximum file size: 5 MB each. Drag & drop or click any box to upload." />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
+                {REQUIRED_DOCS.map(doc => {
+                  const up = docs[doc.id];
+                  const over = dragOver === doc.id;
+                  return (
+                    <div key={doc.id}
+                      onDragOver={e => { e.preventDefault(); setDragOver(doc.id); }}
+                      onDragLeave={() => setDragOver(null)}
+                      onDrop={e => handleDrop(doc.id, e)}
+                      onClick={() => !up && simUpload(doc.id)}
+                      style={{
+                        border: `2px dashed ${over ? T.navy : up ? T.success : T.border}`,
+                        borderRadius: 10, padding: "14px 16px",
+                        background: up ? T.successBg : over ? T.navyLight : T.offWhite,
+                        cursor: up ? "default" : "pointer",
+                        transition: "all .18s",
+                      }}>
+                      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                        <span style={{ fontSize: 26, flexShrink: 0 }}>{up ? "✅" : "📄"}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: T.text, marginBottom: 2 }}>{doc.label}</div>
+                          <div style={{ fontSize: 11, color: T.muted, marginBottom: 6, lineHeight: 1.4 }}>{doc.hint}</div>
+                          {up ? (
+                            <div>
+                              <div style={{ fontSize: 12, color: T.success, fontWeight: 700, wordBreak: "break-all" }}>{up.name}</div>
+                              <div style={{ fontSize: 11, color: T.muted, display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                                <span>📦 {up.size}</span><span>·</span><span>🕐 {up.at}</span>
+                              </div>
+                              <button onClick={e => { e.stopPropagation(); setDocs(d => { const n={...d}; delete n[doc.id]; return n; }); }}
+                                style={{ background:"none", border:"none", color: T.red, fontSize:11, cursor:"pointer", padding:0, marginTop:4, fontFamily:"inherit" }}>
+                                ✕ Remove
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: over ? T.navy : T.muted, fontWeight: over ? 700 : 400 }}>
+                              {over ? "Release to upload" : "Click to upload · or drag & drop PDF here"}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{
+                background: T.navyLight, borderRadius: 8, padding: "10px 16px",
+                display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18,
+              }}>
+                <span style={{ fontSize: 13, color: T.navy, fontWeight: 700 }}>
+                  {Object.keys(docs).length} / {REQUIRED_DOCS.length} documents uploaded
+                </span>
+                {allDocs
+                  ? <span style={{ fontSize: 12, color: T.success, fontWeight: 700 }}>✓ All documents complete — ready to proceed</span>
+                  : <span style={{ fontSize: 12, color: T.red, fontWeight: 600 }}>All 6 documents are required before submission</span>
+                }
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <Btn variant="ghost" onClick={() => setStep(1)}>← Back</Btn>
+                <Btn onClick={() => setStep(3)} disabled={!allDocs} size="lg">Next: Review & Submit →</Btn>
+              </div>
+            </Card>
+          )}
+
+          {step === 3 && (
+            <Card>
+              <SecHead title="Step 4 — Review & Submit Application"
+                sub="Review all details carefully before final submission. Once submitted, this application enters the regulatory review queue." />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+                <div style={{ background: T.navyLight, borderRadius: 10, padding: "16px 18px" }}>
+                  <p style={{ fontSize: 11.5, fontWeight: 800, color: T.navy, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    👤 Pharmacist Details
+                  </p>
+                  <IR label="Full Name"    value={pharmacist?.name} em />
+                  <IR label="Reg. Number" value={regNum} />
+                  <IR label="Status"      value={pharmacist?.status} />
+                  <IR label="State"       value={pharmacist?.state} />
+                </div>
+                <div style={{ background: T.navyLight, borderRadius: 10, padding: "16px 18px" }}>
+                  <p style={{ fontSize: 11.5, fontWeight: 800, color: T.navy, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    🏥 Premises Details
+                  </p>
+                  <IR label="Premises Name" value={premisesInput} em />
+                  <IR label="Address"       value={premises?.address} />
+                  <IR label="Category"      value={category} />
+                  <IR label="License No."   value={premises?.licenseNo} />
+                </div>
+              </div>
+              {category === "Aggregator" && (
+                <div style={{ background: T.goldLight, border: `1px solid ${T.gold}30`, borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
+                  <p style={{ fontSize: 11.5, fontWeight: 800, color: T.gold, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: 0.5 }}>📋 Aggregator Details</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                    <IR label="Aggregator Name"       value={agg.name} />
+                    <IR label="Superintendent"        value={agg.superintendent} />
+                    <IR label="Email"                 value={agg.email} />
+                    <IR label="Phone"                 value={agg.phone} />
+                    <IR label="Affiliated Pharmacies" value={agg.affiliates} />
+                  </div>
+                </div>
+              )}
+              <div style={{ background: T.offWhite, borderRadius: 10, padding: "14px 18px", marginBottom: 16 }}>
+                <p style={{ fontSize: 11.5, fontWeight: 800, color: T.navy, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: 0.5 }}>📄 Uploaded Documents</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {REQUIRED_DOCS.map(d => (
+                    <span key={d.id} style={{ background: T.successBg, color: T.success, fontSize: 11.5, padding: "4px 12px", borderRadius: 20, fontWeight: 700, border: `1px solid ${T.success}25` }}>
+                      ✓ {d.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <Alert type="warn">
+                  By submitting, the Data Entry Officer certifies that all information is accurate and complete. This submission is irrevocable and will enter the PCN regulatory review workflow.
+                </Alert>
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <Btn variant="ghost" onClick={() => setStep(2)}>← Back</Btn>
+                <Btn variant="success" onClick={handleSubmit} disabled={submitting} size="lg">
+                  {submitting ? <><Dots /> Submitting…</> : "✓ Submit Application"}
+                </Btn>
+              </div>
+            </Card>
+          )}
+
+          {apps.length > 0 && (
+            <div style={{ marginTop: 28 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 800, color: T.navy, margin: "0 0 12px" }}>
+                📁 Recent Submissions ({apps.length})
+              </h3>
+              <div style={{ display: "grid", gap: 10 }}>
+                {[...apps].reverse().slice(0,5).map(a => (
+                  <Card key={a.id} style={{ padding: "12px 18px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: T.navy, fontFamily: "monospace" }}>{a.id}</span>
+                        <p style={{ fontSize: 12, color: T.muted, margin: "2px 0 0" }}>{a.pharmacist?.name} · {a.category}</p>
+                        <p style={{ fontSize: 11, color: T.muted, margin: "2px 0 0" }}>{a.timeline?.slice(-1)[0]?.at}</p>
+                      </div>
+                      <Badge status={a.status} />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RECOMMENDATION DASHBOARD
+    // ═══════════════════════════════════════════════════════════════════════
+    function RecDash({ apps, onUpdate }) {
+      const [sel, setSel]           = useState(null);
+      const [decisions, setDec]     = useState({});
+      const [comments, setCom]      = useState({});
+      const [filterCat, setFilter]  = useState("");
+      const [processing, setProc]   = useState(false);
+
+      const queue    = apps.filter(a => a.status === "Submitted");
+      const filtered = filterCat ? queue.filter(a => a.category === filterCat) : queue;
+
+      function canSubmit() {
+        return REQUIRED_DOCS.every(d => {
+          if (!decisions[d.id]) return false;
+          if (decisions[d.id] === "Not Recommended" && !comments[d.id]?.trim()) return false;
+          return true;
+        });
+      }
+
+      function submit() {
+        const hasNotRec = REQUIRED_DOCS.some(d => decisions[d.id] === "Not Recommended");
+        const outcome   = hasNotRec ? "Not Recommended" : "Recommended";
+        setProc(true);
+        setTimeout(() => {
+          const now = new Date().toLocaleString("en-NG");
+          const flagged = REQUIRED_DOCS.filter(d => decisions[d.id] === "Not Recommended");
+          onUpdate(sel.id, {
+            status: outcome,
+            recommendation: {
+              decisions: {...decisions}, comments: {...comments},
+              officer: "Recommendation Officer", officerId: "REC/LAG/001",
+              at: now, overall: outcome,
+            },
+            timeline: [...(sel.timeline || []), {
+              status: outcome, by: "Recommendation Officer", byId: "REC/LAG/001", at: now,
+              note: hasNotRec
+                ? `Application marked Not Recommended. ${flagged.length} document(s) flagged: ${flagged.map(d=>d.label).join("; ")}.`
+                : "All 6 documents reviewed and approved. Application forwarded for final approval.",
+            }],
+          });
+          setSel(null); setDec({}); setCom({}); setProc(false);
+        }, 1200);
+      }
+
+      const allRec = REQUIRED_DOCS.every(d => decisions[d.id] === "Recommended");
+
+      return (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+            <div>
+              <h2 style={{ fontSize: 19, fontWeight: 900, color: T.navy, margin: 0 }}>Recommendation Dashboard</h2>
+              <p style={{ color: T.muted, fontSize: 13, marginTop: 5 }}>{queue.length} application(s) awaiting review</p>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: T.muted }}>Filter:</span>
+              <div style={{ width: 200 }}>
+                <FSelect value={filterCat} onChange={e => setFilter(e.target.value)} options={CATEGORIES} placeholder="All Categories" />
+              </div>
+            </div>
+          </div>
+
+          {!sel ? (
+            filtered.length === 0
+              ? <Card style={{ textAlign:"center", padding:"48px 32px" }}><div style={{fontSize:44,marginBottom:10}}>📭</div><p style={{color:T.muted}}>No applications in queue{filterCat ? ` for "${filterCat}"` : ""}.</p></Card>
+              : (
+                <div style={{ display:"grid", gap:12 }}>
+                  {filtered.map(a => (
+                    <Card key={a.id} style={{ padding:"14px 20px" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:4 }}>
+                            <span style={{ fontWeight:800, fontSize:13.5, color:T.navy, fontFamily:"monospace" }}>{a.id}</span>
+                            <Badge status={a.status} />
+                          </div>
+                          <p style={{ fontSize:13, color:T.text, margin:"2px 0" }}>{a.pharmacist?.name}</p>
+                          <p style={{ fontSize:12, color:T.muted, margin:"2px 0" }}>{a.premisesName} · Category: <strong>{a.category}</strong></p>
+                          <p style={{ fontSize:11, color:T.muted, margin:"4px 0 0" }}>Submitted: {a.timeline?.find(t=>t.status==="Submitted")?.at}</p>
+                        </div>
+                        <Btn onClick={() => { setSel(a); setDec({}); setCom({}); }}>Review Application →</Btn>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )
+          ) : (
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, alignItems:"start" }}>
+              <Card>
+                <SecHead title="Application Details" />
+                <IR label="Application ID"  value={sel.id} em />
+                <IR label="Pharmacist"      value={sel.pharmacist?.name} />
+                <IR label="Reg. Number"     value={sel.regNum} />
+                <IR label="Premises"        value={sel.premisesName} />
+                <IR label="LGA / State"     value={`${sel.premises?.lga}, ${sel.premises?.state}`} />
+                <IR label="Category"        value={sel.category} />
+                <IR label="License No."     value={sel.premises?.licenseNo} />
+                <IR label="Submitted"       value={sel.timeline?.find(t=>t.status==="Submitted")?.at} />
+                {sel.aggDetails && (
+                  <div style={{ marginTop:16 }}>
+                    <p style={{ fontWeight:800, fontSize:12, color:T.gold, textTransform:"uppercase", letterSpacing:0.4, margin:"0 0 8px" }}>📋 Aggregator Details</p>
+                    <IR label="Aggregator Name"  value={sel.aggDetails.name} />
+                    <IR label="Superintendent"   value={sel.aggDetails.superintendent} />
+                    <IR label="Email"            value={sel.aggDetails.email} />
+                    <IR label="Phone"            value={sel.aggDetails.phone} />
+                    <IR label="Affiliates"       value={sel.aggDetails.affiliates} />
+                  </div>
+                )}
+                <div style={{ marginTop:18 }}>
+                  <p style={{ fontWeight:800, fontSize:12, color:T.navy, textTransform:"uppercase", letterSpacing:0.4, margin:"0 0 10px" }}>📄 Uploaded Documents</p>
+                  {REQUIRED_DOCS.map(d => (
+                    <div key={d.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:`1px solid ${T.border}` }}>
+                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                        <span style={{fontSize:16}}>📄</span>
+                        <div>
+                          <div style={{ fontSize:12, fontWeight:600, color:T.text }}>{d.label}</div>
+                          <div style={{ fontSize:11, color:T.muted }}>{sel.docs[d.id]?.name} · {sel.docs[d.id]?.size}</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize:11, color:T.success, fontWeight:700 }}>PDF ✓</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <div>
+                <Card>
+                  <SecHead title="Review Checklist"
+                    sub="Select a decision for each document. 'Not Recommended' requires a mandatory justification comment." />
+                  <div style={{ display:"grid", gap:10, marginBottom:18 }}>
+                    {REQUIRED_DOCS.map(doc => (
+                      <div key={doc.id} style={{
+                        background: T.offWhite, borderRadius:9, padding:"11px 13px",
+                        border: `1px solid ${decisions[doc.id]==="Recommended" ? T.success+"45" : decisions[doc.id]==="Not Recommended" ? T.red+"35" : T.border}`,
+                      }}>
+                        <div style={{ fontSize:12.5, fontWeight:700, color:T.text, marginBottom:8 }}>{doc.label}</div>
+                        <div style={{ display:"flex", gap:8, marginBottom: decisions[doc.id]==="Not Recommended" ? 8 : 0 }}>
+                          {["Recommended","Not Recommended"].map(opt => (
+                            <button key={opt} onClick={() => { setDec(d=>({...d,[doc.id]:opt})); if(opt==="Recommended") setCom(c=>({...c,[doc.id]:""})); }}
+                              style={{
+                                padding:"5px 12px", borderRadius:6, fontSize:11.5, fontWeight:700,
+                                cursor:"pointer", fontFamily:"inherit", border:"none",
+                                background: decisions[doc.id]===opt ? (opt==="Recommended" ? T.success : T.red) : T.border,
+                                color: decisions[doc.id]===opt ? "white" : T.muted,
+                                transition:"all .15s",
+                              }}>
+                              {opt==="Recommended" ? "✓ Rec." : "✗ Not Rec."}
+                            </button>
+                          ))}
+                        </div>
+                        {decisions[doc.id]==="Not Recommended" && (
+                          <div>
+                            <FTextarea
+                              value={comments[doc.id]||""}
+                              onChange={e=>setCom(c=>({...c,[doc.id]:e.target.value}))}
+                              placeholder="Mandatory: Describe the deficiency or issue with this document…"
+                              rows={2}
+                            />
+                            {!comments[doc.id]?.trim() && (
+                              <p style={{ fontSize:11, color:T.red, margin:"4px 0 0" }}>⚠ Justification comment required</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginBottom:14 }}>
+                    {canSubmit()
+                      ? allRec
+                        ? <Alert type="success">All documents marked Recommended. Ready to forward for approval.</Alert>
+                        : <Alert type="warn">Application will be submitted as "Not Recommended" with flagged items.</Alert>
+                      : <Alert type="info">Review all documents. Provide justification for any "Not Recommended" item.</Alert>
+                    }
+                  </div>
+                  <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                    <Btn variant="ghost" onClick={() => setSel(null)}>← Queue</Btn>
+                    <Btn variant={allRec ? "success" : "danger"} disabled={!canSubmit()||processing} onClick={submit}>
+                      {processing ? <><Dots/> Processing…</> : allRec ? "✓ Submit — Recommended" : "✗ Submit — Not Recommended"}
+                    </Btn>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // APPROVAL DASHBOARD
+    // ═══════════════════════════════════════════════════════════════════════
+    function ApproveDash({ apps, onUpdate }) {
+      const [sel, setSel]       = useState(null);
+      const [reason, setReason] = useState("");
+      const [proc, setProc]     = useState(false);
+
+      const queue = apps.filter(a => a.status === "Recommended" || a.status === "Not Recommended");
+
+      function decide(dec) {
+        if (dec === "Declined" && !reason.trim()) return;
+        setProc(true);
+        setTimeout(() => {
+          const now = new Date().toLocaleString("en-NG");
+          onUpdate(sel.id, {
+            status: dec,
+            approval: {
+              decision: dec,
+              reason: reason.trim() || "Application meets all regulatory requirements for Online Pharmacy Practice.",
+              officer: "Approval Officer", officerId: "APO/HQ/001", at: now,
+            },
+            timeline: [...(sel.timeline||[]), {
+              status: dec, by: "Approval Officer", byId: "APO/HQ/001", at: now,
+              note: dec === "Approved"
+                ? "Application approved. Permit issuance authorised. Forwarded to Printing Officer."
+                : `Application declined. Reason: ${reason}`,
+            }],
+          });
+          setSel(null); setReason(""); setProc(false);
+        }, 1200);
+      }
+
+      return (
+        <div>
+          <div style={{ marginBottom:20 }}>
+            <h2 style={{ fontSize:19, fontWeight:900, color:T.navy, margin:0 }}>Approval Dashboard</h2>
+            <p style={{ color:T.muted, fontSize:13, marginTop:5 }}>{queue.length} application(s) pending final approval decision</p>
+          </div>
+
+          {!sel ? (
+            queue.length === 0
+              ? <Card style={{ textAlign:"center", padding:"48px 32px" }}><div style={{fontSize:44,marginBottom:10}}>📭</div><p style={{color:T.muted}}>No applications pending approval.</p></Card>
+              : (
+                <div style={{ display:"grid", gap:12 }}>
+                  {queue.map(a => (
+                    <Card key={a.id} style={{ padding:"14px 20px" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:4 }}>
+                            <span style={{ fontWeight:800, fontSize:13.5, color:T.navy, fontFamily:"monospace" }}>{a.id}</span>
+                            <Badge status={a.status} />
+                          </div>
+                          <p style={{ fontSize:13, color:T.text, margin:"2px 0" }}>{a.pharmacist?.name}</p>
+                          <p style={{ fontSize:12, color:T.muted, margin:"2px 0" }}>{a.premisesName} · {a.category}</p>
+                          <p style={{ fontSize:11, color:T.muted, margin:"4px 0 0" }}>
+                            Reviewed by: {a.recommendation?.officer} on {a.recommendation?.at}
+                          </p>
+                        </div>
+                        <Btn onClick={() => { setSel(a); setReason(""); }}>Review &amp; Decide →</Btn>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )
+          ) : (
+            <Card>
+              <SecHead title={`Approval Decision — ${sel.id}`} />
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20, marginBottom:22 }}>
+                {[
+                  ["Application ID",  sel.id,              true ],
+                  ["Pharmacist",      sel.pharmacist?.name,false],
+                  ["Reg. Number",     sel.regNum,          false],
+                  ["Premises",        sel.premisesName,    false],
+                  ["Category",        sel.category,        false],
+                  ["State",           sel.premises?.state, false],
+                  ["License No.",     sel.premises?.licenseNo, false],
+                  ["Rec. Status",     null,                false, sel.status],
+                  ["Reviewed By",     sel.recommendation?.officer, false],
+                ].map(([l,v,em,badge]) => (
+                  <div key={l}>
+                    <p style={{ fontSize:11, fontWeight:700, color:T.muted, margin:"0 0 3px", textTransform:"uppercase", letterSpacing:0.4 }}>{l}</p>
+                    <p style={{ fontSize:13, color:T.text, margin:0, fontWeight:em?700:400 }}>
+                      {badge ? <Badge status={badge} /> : (v||"—")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {sel.recommendation && (
+                <div style={{ background:T.offWhite, borderRadius:10, padding:"14px 16px", marginBottom:20 }}>
+                  <p style={{ fontWeight:800, fontSize:12, color:T.navy, textTransform:"uppercase", letterSpacing:0.4, margin:"0 0 10px" }}>
+                    📋 Recommendation Officer's Review
+                  </p>
+                  {REQUIRED_DOCS.map(d => {
+                    const dec = sel.recommendation.decisions?.[d.id];
+                    const com = sel.recommendation.comments?.[d.id];
+                    return (
+                      <div key={d.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"7px 0", borderBottom:`1px solid ${T.border}` }}>
+                        <span style={{ fontSize:12, color:T.text, flex:1 }}>{d.label}</span>
+                        <div style={{ textAlign:"right", maxWidth:300 }}>
+                          <Badge status={dec||"—"} />
+                          {com && <p style={{ fontSize:11, color:T.warn, margin:"3px 0 0" }}>{com}</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <FL label="Decision Notes / Reason for Decline" hint="Required when declining. Recommended for approvals (audit trail).">
+                <FTextarea value={reason} onChange={e=>setReason(e.target.value)}
+                  placeholder="Enter approval notes or decline reason…" rows={3} />
+              </FL>
+
+              {!reason.trim() && (
+                <div style={{ marginBottom:14 }}>
+                  <Alert type="warn">A reason must be entered to decline an application.</Alert>
+                </div>
+              )}
+
+              <div style={{ display:"flex", gap:12, alignItems:"center", marginTop:8 }}>
+                <Btn variant="ghost" onClick={() => setSel(null)}>← Back</Btn>
+                <Btn variant="success" onClick={() => decide("Approved")} disabled={proc} size="lg">
+                  {proc ? <><Dots/> Processing…</> : "✓ Approve Application"}
+                </Btn>
+                <Btn variant="danger" onClick={() => decide("Declined")} disabled={!reason.trim()||proc} size="lg">
+                  ✗ Decline Application
+                </Btn>
+              </div>
+            </Card>
+          )}
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRINTING DASHBOARD
+    // ═══════════════════════════════════════════════════════════════════════
+    function PrintDash({ apps, onUpdate }) {
+      const [generating, setGenerating] = useState(null);
+      const [preview, setPreview]       = useState(null);
+
+      const list = apps.filter(a => a.status === "Approved" || a.status === "Permit Generated");
+
+      function generate(app) {
+        setGenerating(app.id);
+        setTimeout(() => {
+          const sc  = app.premises?.stateCode || "NG";
+          const yr  = new Date().getFullYear();
+          const num = String(permitSeq++).padStart(4, "0");
+          const pno = `PCN/OPP/${sc}/${yr}/${num}`;
+          const now = new Date().toLocaleString("en-NG");
+          onUpdate(app.id, {
+            status: "Permit Generated",
+            permitNumber: pno,
+            timeline: [...(app.timeline||[]), {
+              status: "Permit Generated", by: "Printing Officer", byId: "PRT/001", at: now,
+              note: `Permit number ${pno} generated and logged for record-keeping.`,
+            }],
+          });
+          setGenerating(null);
+        }, 1500);
+      }
+
+      return (
+        <div>
+          <div style={{ marginBottom:20 }}>
+            <h2 style={{ fontSize:19, fontWeight:900, color:T.navy, margin:0 }}>Printing Dashboard</h2>
+            <p style={{ color:T.muted, fontSize:13, marginTop:5 }}>Generate and print Online Pharmacy Practice permits for approved applications</p>
+          </div>
+
+          {preview && (
+            <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:900, padding:20 }}
+              onClick={() => setPreview(null)}>
+              <div onClick={e=>e.stopPropagation()} style={{
+                background:"white", borderRadius:12, maxWidth:680, width:"100%",
+                padding:"40px 44px", border:`3px solid ${T.navy}`,
+                fontFamily:"Georgia, serif",
+              }}>
+                <div style={{ textAlign:"center", marginBottom:22 }}>
+                  <div style={{ display:"flex", justifyContent:"center", marginBottom:12 }}>
+                    <PCNLogo size={72} />
+                  </div>
+                  <h2 style={{ fontSize:17, fontWeight:900, color:T.navy, margin:0, textTransform:"uppercase", letterSpacing:2.5 }}>
+                    Pharmacy Council of Nigeria
+                  </h2>
+                  <p style={{ fontSize:12, color:T.muted, margin:"3px 0 0" }}>Online Pharmacy Practice Division</p>
+                  <div style={{ height:2.5, background:`linear-gradient(90deg,${T.red},${T.gold},${T.red})`, margin:"14px 0 10px", borderRadius:2 }} />
+                  <h3 style={{ fontSize:15.5, fontWeight:900, color:T.red, textTransform:"uppercase", letterSpacing:3, margin:0 }}>
+                    Certificate of Permit
+                  </h3>
+                  <p style={{ fontSize:12, color:T.muted, margin:"3px 0 0" }}>Online Pharmacy Practice — Federal Republic of Nigeria</p>
+                </div>
+
+                <p style={{ fontSize:13, color:T.text, textAlign:"center", marginBottom:18, lineHeight:1.7 }}>
+                  This is to certify that the pharmacy premises listed below is duly registered and hereby permitted to operate an Online Pharmacy Practice in Nigeria pursuant to the Pharmacy Council of Nigeria Act.
+                </p>
+
+                <div style={{ background:T.navyLight, borderRadius:8, padding:"16px 20px", marginBottom:22 }}>
+                  <IR label="Permit Number"   value={preview.permitNumber} em />
+                  <IR label="Premises Name"   value={preview.premisesName} />
+                  <IR label="Superintendent"  value={preview.pharmacist?.name} />
+                  <IR label="PCN Reg. No."    value={preview.regNum} />
+                  <IR label="Category"        value={preview.category} />
+                  <IR label="Address"         value={preview.premises?.address} />
+                  <IR label="LGA / State"     value={`${preview.premises?.lga}, ${preview.premises?.state}`} />
+                  <IR label="Issue Date"      value={new Date().toLocaleDateString("en-NG", {day:"2-digit",month:"long",year:"numeric"})} />
+                  <IR label="Valid Until"     value="31 December 2027" />
+                </div>
+
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:22 }}>
+                  <div style={{ textAlign:"center", borderTop:`2px solid ${T.border}`, paddingTop:8 }}>
+                    <p style={{ fontSize:11, color:T.muted }}>Registrar, PCN</p>
+                  </div>
+                  <div style={{ textAlign:"center", borderTop:`2px solid ${T.border}`, paddingTop:8 }}>
+                    <p style={{ fontSize:11, color:T.muted }}>Official Stamp &amp; Date</p>
+                  </div>
+                </div>
+
+                <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+                  <Btn variant="primary" onClick={() => window.print()}>🖨️ Print Permit</Btn>
+                  <Btn variant="ghost" onClick={() => setPreview(null)}>✕ Close</Btn>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {list.length === 0
+            ? <Card style={{ textAlign:"center", padding:"48px 32px" }}><div style={{fontSize:44,marginBottom:10}}>🖨️</div><p style={{color:T.muted}}>No approved applications available for permit generation.</p></Card>
+            : (
+              <div style={{ display:"grid", gap:16 }}>
+                {list.map(app => (
+                  <Card key={app.id} noPad>
+                    <div style={{ padding:"18px 22px" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                        <div style={{ display:"flex", gap:14 }}>
+                          <PCNLogo size={46} />
+                          <div>
+                            <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:5 }}>
+                              <span style={{ fontWeight:800, fontSize:13.5, color:T.navy, fontFamily:"monospace" }}>{app.id}</span>
+                              <Badge status={app.status} />
+                            </div>
+                            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,auto)", gap:"4px 22px" }}>
+                              {[["Pharmacist",app.pharmacist?.name],["Premises",app.premisesName],["Category",app.category],["State",app.premises?.state]].map(([l,v])=>(
+                                <div key={l}>
+                                  <p style={{fontSize:10.5,color:T.muted,margin:0}}>{l}</p>
+                                  <p style={{fontSize:12.5,color:T.text,fontWeight:600,margin:0}}>{v}</p>
+                                </div>
+                              ))}
+                            </div>
+                            {app.permitNumber && (
+                              <div style={{ marginTop:7, display:"flex", gap:8, alignItems:"center" }}>
+                                <span style={{ fontSize:11, color:T.muted }}>Permit:</span>
+                                <span style={{ fontSize:13, fontWeight:800, color:T.navy, fontFamily:"monospace" }}>{app.permitNumber}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display:"flex", gap:10, flexShrink:0 }}>
+                          {!app.permitNumber && (
+                            <Btn variant="gold" onClick={() => generate(app)} disabled={generating===app.id}>
+                              {generating===app.id ? <><Dots/> Generating…</> : "🔢 Generate Permit No."}
+                            </Btn>
+                          )}
+                          {app.permitNumber && (
+                            <>
+                              <Btn variant="outline" onClick={() => setPreview(app)}>👁 Preview Permit</Btn>
+                              <Btn variant="primary" onClick={() => window.print()}>🖨️ Print</Btn>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {app.permitNumber && (
+                      <div style={{ padding:"9px 22px", background:T.successBg, display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${T.success}20` }}>
+                        <span style={{ fontSize:12.5, color:T.success, fontWeight:700 }}>
+                          ✓ Permit Generated: <span style={{fontFamily:"monospace"}}>{app.permitNumber}</span>
+                        </span>
+                        <span style={{ fontSize:11, color:T.muted }}>
+                          Generated: {app.timeline?.find(t=>t.status==="Permit Generated")?.at}
+                        </span>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )
+          }
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // AUDIT TRAIL DASHBOARD
+    // ═══════════════════════════════════════════════════════════════════════
+    function AuditDash({ apps }) {
+      const [expanded, setExpanded]   = useState(null);
+      const [filterStatus, setFilter] = useState("");
+
+      const shown = filterStatus ? apps.filter(a => a.status === filterStatus) : apps;
+
+      const tlColors = {
+        Draft: "#4338CA", Submitted: "#1D4ED8", Recommended: T.success,
+        "Not Recommended": T.warn, Approved: T.success,
+        Declined: T.red, "Permit Generated": "#7C3AED",
+      };
+
+      const stats = [
+        { l:"Total",           n: apps.length,                                        c: T.navy   },
+        { l:"Submitted",       n: apps.filter(a=>a.status==="Submitted").length,       c:"#1D4ED8" },
+        { l:"Recommended",     n: apps.filter(a=>a.status==="Recommended").length,     c: T.success},
+        { l:"Not Recommended", n: apps.filter(a=>a.status==="Not Recommended").length, c: T.warn   },
+        { l:"Approved",        n: apps.filter(a=>a.status==="Approved").length,        c: T.success},
+        { l:"Permits Issued",  n: apps.filter(a=>a.status==="Permit Generated").length,c:"#7C3AED"},
+        { l:"Declined",        n: apps.filter(a=>a.status==="Declined").length,        c: T.red    },
+      ];
+
+      return (
+        <div>
+          <div style={{ marginBottom:20 }}>
+            <h2 style={{ fontSize:19, fontWeight:900, color:T.navy, margin:0 }}>Audit Trail</h2>
+            <p style={{ color:T.muted, fontSize:13, marginTop:5 }}>Complete application history with timestamped lifecycle events and officer records</p>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:10, marginBottom:24 }}>
+            {stats.map(s => (
+              <Card key={s.l} style={{ padding:"12px 14px", textAlign:"center" }}>
+                <div style={{ fontSize:24, fontWeight:900, color:s.c, marginBottom:2 }}>{s.n}</div>
+                <div style={{ fontSize:10.5, color:T.muted, fontWeight:700, lineHeight:1.3 }}>{s.l}</div>
+              </Card>
+            ))}
+          </div>
+
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
+            <span style={{ fontSize:12, color:T.muted }}>Filter by status:</span>
+            <div style={{ width:220 }}>
+              <FSelect value={filterStatus} onChange={e=>setFilter(e.target.value)}
+                options={["Submitted","Recommended","Not Recommended","Approved","Declined","Permit Generated"]}
+                placeholder="All Statuses"
+              />
+            </div>
+          </div>
+
+          {shown.length === 0
+            ? <Card style={{ textAlign:"center", padding:48 }}><p style={{color:T.muted}}>No applications found.</p></Card>
+            : (
+              <div style={{ display:"grid", gap:12 }}>
+                {[...shown].reverse().map(app => (
+                  <Card key={app.id} noPad>
+                    <div onClick={() => setExpanded(expanded===app.id ? null : app.id)}
+                      style={{ padding:"14px 20px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <div>
+                        <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:4 }}>
+                          <span style={{ fontWeight:800, fontSize:13, color:T.navy, fontFamily:"monospace" }}>{app.id}</span>
+                          <Badge status={app.status} />
+                          {app.permitNumber && (
+                            <span style={{ fontSize:11, fontFamily:"monospace", background:T.navyLight, color:T.navy, padding:"2px 8px", borderRadius:5, fontWeight:700 }}>
+                              {app.permitNumber}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize:12.5, color:T.text, margin:"2px 0 0" }}>
+                          {app.pharmacist?.name} · {app.premisesName} · {app.category}
+                        </p>
+                      </div>
+                      <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+                        <span style={{ fontSize:11, color:T.muted }}>{app.timeline?.length||0} events</span>
+                        <span style={{ fontSize:13, color:T.muted }}>{expanded===app.id ? "▲" : "▼"}</span>
+                      </div>
+                    </div>
+
+                    {expanded === app.id && (
+                      <div style={{ borderTop:`1px solid ${T.border}`, padding:"16px 20px" }}>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:20, marginBottom:20 }}>
+                          <div>
+                            <p style={{ fontSize:11, fontWeight:800, color:T.navy, textTransform:"uppercase", letterSpacing:0.5, margin:"0 0 8px" }}>Application</p>
+                            <IR label="Reg. Number"  value={app.regNum} />
+                            <IR label="Premises"     value={app.premisesName} />
+                            <IR label="State"        value={app.premises?.state} />
+                            <IR label="Category"     value={app.category} />
+                            <IR label="License No."  value={app.premises?.licenseNo} />
+                            {app.permitNumber && <IR label="Permit No." value={app.permitNumber} em />}
+                          </div>
+                          {app.recommendation && (
+                            <div>
+                              <p style={{ fontSize:11, fontWeight:800, color:T.navy, textTransform:"uppercase", letterSpacing:0.5, margin:"0 0 8px" }}>Recommendation</p>
+                              <IR label="Officer"  value={app.recommendation.officer} />
+                              <IR label="Date"     value={app.recommendation.at} />
+                              <IR label="Decision" value={app.recommendation.overall} />
+                              <div style={{ marginTop:8 }}>
+                                {REQUIRED_DOCS.map(d => {
+                                  const dec = app.recommendation.decisions?.[d.id];
+                                  if (!dec) return null;
+                                  return (
+                                    <div key={d.id} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom:`1px solid ${T.border}` }}>
+                                      <span style={{ fontSize:11, color:T.text }}>{d.label}</span>
+                                      <Badge status={dec} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {app.approval && (
+                            <div>
+                              <p style={{ fontSize:11, fontWeight:800, color:T.navy, textTransform:"uppercase", letterSpacing:0.5, margin:"0 0 8px" }}>Approval</p>
+                              <IR label="Officer"   value={app.approval.officer} />
+                              <IR label="Date"      value={app.approval.at} />
+                              <IR label="Decision"  value={app.approval.decision} />
+                              {app.approval.reason && <IR label="Notes" value={app.approval.reason} />}
+                            </div>
+                          )}
+                        </div>
+
+                        <p style={{ fontSize:11, fontWeight:800, color:T.navy, textTransform:"uppercase", letterSpacing:0.5, margin:"0 0 14px" }}>📅 Lifecycle Timeline</p>
+                        <div style={{ position:"relative", paddingLeft:28 }}>
+                          <div style={{ position:"absolute", left:9, top:0, bottom:0, width:2, background:T.border }} />
+                          {(app.timeline||[]).map((ev, i, arr) => (
+                            <div key={i} style={{ position:"relative", marginBottom: i<arr.length-1 ? 18 : 0, paddingLeft:18 }}>
+                              <div style={{
+                                position:"absolute", left:-19, top:2,
+                                width:12, height:12, borderRadius:"50%",
+                                background: tlColors[ev.status] || T.muted,
+                                border:"2.5px solid white",
+                                boxShadow:`0 0 0 2px ${tlColors[ev.status]||T.muted}`,
+                              }} />
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:20 }}>
+                                <div style={{ flex:1 }}>
+                                  <span style={{ fontSize:12.5, fontWeight:800, color: tlColors[ev.status]||T.text }}>{ev.status}</span>
+                                  <p style={{ fontSize:12, color:T.textMid, margin:"2px 0 0", lineHeight:1.5 }}>{ev.note}</p>
+                                </div>
+                                <div style={{ textAlign:"right", flexShrink:0 }}>
+                                  <p style={{ fontSize:11.5, color:T.text, fontWeight:600, margin:0 }}>{ev.by}</p>
+                                  <p style={{ fontSize:10.5, color:T.muted, margin:"2px 0 0", fontFamily:"monospace" }}>{ev.byId}</p>
+                                  <p style={{ fontSize:10.5, color:T.muted, margin:"2px 0 0" }}>{ev.at}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )
+          }
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ROOT APP
+    // ═══════════════════════════════════════════════════════════════════════
+    function App() {
+      const [role, setRole] = useState(null);
+      const [apps, setApps] = useState(INITIAL_APPS);
+      const [tab, setTab]   = useState("main");
+
+      function updateApp(id, changes) {
+        setApps(list => list.map(a => a.id === id ? { ...a, ...changes } : a));
+      }
+      function addApp(app) {
+        setApps(list => [...list, app]);
+      }
+
+      if (!role) return <Login onLogin={r => { setRole(r); setTab("main"); }} />;
+
+      const dashboards = {
+        data_entry:     <DataEntry   apps={apps} onSubmit={addApp}    />,
+        recommendation: <RecDash     apps={apps} onUpdate={updateApp} />,
+        approval:       <ApproveDash apps={apps} onUpdate={updateApp} />,
+        printing:       <PrintDash   apps={apps} onUpdate={updateApp} />,
+      };
+
+      return (
+        <Shell role={role} onLogout={() => { setRole(null); setTab("main"); }} tab={tab} setTab={setTab}>
+          {tab === "audit" ? <AuditDash apps={apps} /> : dashboards[role]}
+        </Shell>
+      );
+    }
+
+    // ── Mount ──────────────────────────────────────────────────────────────
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
